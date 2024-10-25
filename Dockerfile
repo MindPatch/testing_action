@@ -32,6 +32,7 @@ ENV PATH="$PATH:/usr/local/bin"
 
 # Define the working directory and mount the volume for source code access
 WORKDIR /app
+RUN pip install PyYAML
 VOLUME ["/app"]
 
 # Set entrypoint to run the main script
