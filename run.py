@@ -18,6 +18,8 @@ class ConfigLoader:
             print(f"Loading configuration from {self.config_file}...")
             with open(self.config_file, "r") as file:
                 self.config = yaml.safe_load(file) or {}
+            print("Configuration loaded:")
+            print(self.config)
         else:
             print("Configuration file not found; defaulting to environment variables.")
 
@@ -57,16 +59,22 @@ class Scanner:
 
     def run_semgrep(self):
         print("Running Semgrep scan...")
+        subprocess.run(["ls", "-la", self.workspace_dir], check=True)
         subprocess.run(["semgrep", "scan", "--config=auto", "--sarif-output", self.semgrep_output], check=True)
+        print("Semgrep scan complete.")
 
     def run_trivy(self):
         print("Running Trivy scan...")
+        subprocess.run(["ls", "-la", self.workspace_dir], check=True)
         subprocess.run(["trivy", "fs", "-f", "json", "-o", self.trivy_output, self.workspace_dir], check=True)
+        print("Trivy scan complete.")
 
     def convert_reports(self):
         print("Converting scan results for SonarQube compatibility...")
+        subprocess.run(["ls", "-la", self.workspace_dir], check=True)
         subprocess.run(["python", "/usr/local/bin/convert_trivy.py", self.trivy_output, ">", self.sonar_trivy], shell=True)
         subprocess.run(["python", "/usr/local/bin/convert_semgrep.py", self.semgrep_output, self.sonar_semgrep], shell=True)
+        print("Report conversion complete.")
 
 
 class ReportChecker:
@@ -132,6 +140,7 @@ class SonarScanner:
         else:
             print("Running SonarScanner without external issue reports.")
 
+        print(f"SonarScanner command: {' '.join(command)}")
         subprocess.run(command, check=True)
 
 
