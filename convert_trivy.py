@@ -94,7 +94,8 @@ def main(args):
     sonar_issues = make_sonar_issues(vulnerabilities, file_path=file_path)
     sonar_report = make_sonar_report(sonar_issues)
 
-    with open("sonar_trivy.json", "w") as f:
+    out_file = os.path.join("/github/workspace/", "sonar_trivy.json")
+    with open(out_file, "w") as f:
         json.dump(sonar_report,f)
 
 if __name__ == "__main__":
