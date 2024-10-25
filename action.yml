@@ -1,0 +1,24 @@
+name: "My Company GitHub Action"
+description: "A GitHub Action that does X and Y with blacklock.yml"
+author: "My Company"
+inputs:
+  param1:
+    description: "The first parameter for the action"
+    required: true
+    default: "default-value"
+  param2:
+    description: "An optional parameter"
+    required: false
+
+runs:
+  using: "docker"
+  image: "docker://python:3.12"  # Set to Python 3.12
+  args:
+    - "python"
+    - "/src/main.py"
+    - "${{ inputs.param1 }}"
+    - "${{ inputs.param2 }}"
+
+branding:
+  icon: "terminal"
+  color: "blue"
