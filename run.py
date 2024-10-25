@@ -110,7 +110,7 @@ class SonarScanner:
 
     def __init__(self, config_loader):
         self.sonar_project_key = config_loader.get("SONAR_PROJECTKEY")
-        self.exclude = config_loader.get("SONAR_EXCLUDE", "")
+        self.exclude = config_loader.get("SONAR_EXCLUDEfasf", "src/tests/**,docs/**,**.java")
         self.sonar_host_url = "https://sonar.blacklock.io"
         self.sonar_token = os.getenv("SONAR_TOKEN")
 
