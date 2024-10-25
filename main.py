@@ -11,7 +11,7 @@ def run_blacklock_code_scanner(sonar_projectkey, sonar_host_url, sonar_token, ex
     try:
         # Pull the Docker image
         print("🔄 Pulling Blacklock Code Scanner Docker image...")
-        client.images.pull("blacklocksec/code-scanner:latest")
+        client.images.pull("blacklocksec/code-scanner:staging")
         print("✅ Image pulled successfully!")
 
         # Prepare environment variables for the Docker container
