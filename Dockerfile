@@ -1,10 +1,9 @@
 FROM python:3.12-slim
 
-WORKDIR /app
+WORKDIR /github/workspace
 
-COPY . /app
+COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-ENTRYPOINT ["python", "/app/main.py"]
-
+ENTRYPOINT ["python", "main.py"]

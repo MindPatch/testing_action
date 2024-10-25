@@ -1,11 +1,14 @@
 import sys
+import yaml
 import os
 
 def parse_blacklock_config():
     config_path = "blacklock.yml"
     if os.path.exists(config_path):
         with open(config_path, "r") as file:
-            return {"name":"Mike"}
+            config = yaml.safe_load(file)
+            print(f"Parsed configuration: {config}")
+            return config
     else:
         print("blacklock.yml not found in repository root.")
         return {}
@@ -16,6 +19,7 @@ def main(param1, param2):
 
     # Perform main action logic using parameters and parsed config
     print(f"Running the action with param1: {param1} and param2: {param2}")
+    os.system("ls -lah")
     # Use config as needed
 
 if __name__ == "__main__":
