@@ -31,6 +31,9 @@ COPY checker.py /usr/local/bin/checker.py
 RUN chmod +x /usr/local/bin/run.sh
 ENV PATH="$PATH:/usr/local/bin"
 
-# Define the working directory and default entrypoint
-WORKDIR /github/workspace/
+# Define the working directory and mount the volume for source code access
+WORKDIR /app
+VOLUME ["/app"]
+
+# Set entrypoint to run the main script
 ENTRYPOINT ["bash", "/usr/local/bin/run.sh"]
