@@ -2,9 +2,9 @@ import os
 import json
 import sys
 import yaml
-import emoji
-import collections
+import subprocess
 from pathlib import Path
+import emoji
 from typing import Final
 
 
@@ -62,17 +62,17 @@ class Scanner:
 
     def run_semgrep(self):
         print("Running Semgrep scan...")
-        # Simulate the Semgrep scan for demonstration purposes
+        subprocess.run(["semgrep", "scan", "--config=auto", "--sarif-output", self.semgrep_output], check=True)
         print("Semgrep scan complete.")
 
     def run_trivy(self):
         print("Running Trivy scan...")
-        # Simulate the Trivy scan for demonstration purposes
+        subprocess.run(["trivy", "fs", "-f", "sarif", "-o", self.trivy_output, self.workspace_dir], check=True)
         print("Trivy scan complete.")
 
-    def convert_semgrep(self, source, target):
+    def convert_semgrep(self):
         """Convert Semgrep SARIF report to SonarQube-compatible JSON format."""
-        sarif_data = json.loads(Path(source).read_text(encoding='utf-8'))
+        sarif_data = json.loads(Path(self.semgrep_output).read_text(encoding='utf-8'))
         issues = []
 
         for run_data in sarif_data.get('runs', []):
@@ -91,12 +91,12 @@ class Scanner:
                 }
                 issues.append(issue)
 
-        Path(target).write_text(json.dumps({'issues': issues}, indent=2), encoding='utf-8')
-        print(f"Semgrep report converted to SonarQube format: {target}")
+        Path(self.sonar_semgrep).write_text(json.dumps({'issues': issues}, indent=2), encoding='utf-8')
+        print(f"Semgrep report converted to SonarQube format: {self.sonar_semgrep}")
 
-    def convert_trivy(self, source, target):
+    def convert_trivy(self):
         """Convert Trivy report to SonarQube-compatible JSON format."""
-        report = json.loads(Path(source).read_text(encoding='utf-8'))
+        report = json.loads(Path(self.trivy_output).read_text(encoding='utf-8'))
         issues = {'rules': [], 'issues': []}
         seen_rules = set()
 
@@ -121,8 +121,8 @@ class Scanner:
                     "primaryLocation": {"filePath": vuln["Target"], "message": rule_id}
                 })
 
-        Path(target).write_text(json.dumps(issues, indent=2), encoding='utf-8')
-        print(f"Trivy report converted to SonarQube format: {target}")
+        Path(self.sonar_trivy).write_text(json.dumps(issues, indent=2), encoding='utf-8')
+        print(f"Trivy report converted to SonarQube format: {self.sonar_trivy}")
 
 
 class ReportChecker:
@@ -144,21 +144,24 @@ class SonarScanner:
         self.sonar_project_key = config_loader.get("SONAR_PROJECTKEY")
         self.sonar_host_url = "https://sonar.blacklock.io"
         self.sonar_token = os.getenv("SONAR_TOKEN")
+        self.exclude = "**/*.java"  # Exclude all .java files
 
     def build_base_command(self):
-        return [
+        command = [
             "sonar-scanner",
             f"-Dsonar.projectKey={self.sonar_project_key}",
             f"-Dsonar.host.url={self.sonar_host_url}",
             f"-Dsonar.login={self.sonar_token}",
-            f"-Dsonar.exclusions='**.java'"
+            f"-Dsonar.exclusions={self.exclude}"
         ]
+        return command
 
     def run(self, trivy_report, semgrep_report):
         command = self.build_base_command()
         if os.path.isfile(trivy_report) and os.path.isfile(semgrep_report):
             command.append(f"-Dsonar.externalIssuesReportPaths={trivy_report},{semgrep_report}")
         print(f"Running SonarScanner with command: {' '.join(command)}")
+        subprocess.run(command, check=True)
 
 
 def main():
@@ -169,8 +172,8 @@ def main():
     scanner = Scanner()
     scanner.run_trivy()
     scanner.run_semgrep()
-    scanner.convert_trivy(scanner.trivy_output, scanner.sonar_trivy)
-    scanner.convert_semgrep(scanner.semgrep_output, scanner.sonar_semgrep)
+    scanner.convert_trivy()
+    scanner.convert_semgrep()
 
     report_checker = ReportChecker()
     report_checker.check_and_remove(scanner.sonar_trivy)
