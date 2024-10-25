@@ -73,7 +73,7 @@ class Scanner:
     def convert_reports(self):
         print("Converting scan results for SonarQube compatibility...")
         subprocess.run(["ls", "-la", self.workspace_dir], check=True)
-        subprocess.run(["python", "/usr/local/bin/convert_trivy.py", self.trivy_output, ">", self.sonar_trivy], shell=True)
+        subprocess.run(["python", "/usr/local/bin/convert_trivy.py", self.trivy_output], shell=True)
         subprocess.run(["python", "/usr/local/bin/convert_semgrep.py", self.semgrep_output, self.sonar_semgrep], shell=True)
         print("Report conversion complete.")
 

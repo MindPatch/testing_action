@@ -66,7 +66,7 @@ def make_sonar_issues(vulnerabilities, file_path=None):
             "ruleId": rule_id,
             "primaryLocation": {
                 "message": f"{rule_id} {apply_changes(vuln['Title'])}",
-                "filePath": file_path or vuln["Target"],
+                "filePath": vuln["Target"],
             },
         })
 
@@ -77,24 +77,14 @@ def make_sonar_report(res):
     return json.dumps(res, indent=2)
 
 def main(args):
-    if len(args) < 2:
-        sys.exit(f"{LOG_PREFIX} Missing filename argument.")
+    file_path = args[1]
 
-    filename = args[1]
-    if not os.path.exists(filename):
-        sys.exit(f"{LOG_PREFIX} File not found: {filename}")
-
-    file_path = None
-    for arg in args[2:]:
-        if arg.startswith("filePath="):
-            file_path = arg.split("=", 1)[-1].strip()
-
-    report = load_trivy_report(filename)
+    report = load_trivy_report(file_path)
     vulnerabilities = parse_trivy_report(report)
-    sonar_issues = make_sonar_issues(vulnerabilities, file_path=file_path)
+    sonar_issues = make_sonar_issues(vulnerabilities)
     sonar_report = make_sonar_report(sonar_issues)
 
-    out_file = os.path.join("/github/workspace/", "sonar_trivy.json")
+    out_file = os.path.join("/github/workspace", "sonar_trivy.json")
     with open(out_file, "w") as f:
         json.dump(sonar_report,f)
 
