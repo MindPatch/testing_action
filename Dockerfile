@@ -24,7 +24,7 @@ COPY --from=trivy /usr/local/bin/trivy /usr/local/bin/trivy
 COPY --from=python-env /app/ /app/
 
 # Copy necessary scripts
-COPY run.sh /usr/local/bin/run.py
+COPY run.py /usr/local/bin/run.py
 COPY convert_trivy.py /usr/local/bin/convert_trivy.py
 COPY convert_semgrep.py /usr/local/bin/convert_semgrep.py
 COPY checker.py /usr/local/bin/checker.py
