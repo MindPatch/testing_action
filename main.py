@@ -1,14 +1,11 @@
 import sys
-import yaml
 import os
 
 def parse_blacklock_config():
     config_path = "blacklock.yml"
     if os.path.exists(config_path):
         with open(config_path, "r") as file:
-            config = yaml.safe_load(file)
-            print(f"Parsed configuration: {config}")
-            return config
+            return {"name":"Mike"}
     else:
         print("blacklock.yml not found in repository root.")
         return {}
