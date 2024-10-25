@@ -24,7 +24,7 @@ COPY --from=trivy /usr/local/bin/trivy /usr/local/bin/trivy
 COPY --from=python-env /app/ /app/
 
 # Copy necessary scripts
-COPY run.sh /usr/local/bin/run.sh
+COPY run.py /usr/local/bin/run.py
 COPY convert_trivy.py /usr/local/bin/convert_trivy.py
 COPY convert_semgrep.py /usr/local/bin/convert_semgrep.py
 COPY checker.py /usr/local/bin/checker.py
@@ -36,4 +36,4 @@ RUN pip install PyYAML
 VOLUME ["/app"]
 
 # Set entrypoint to run the main script
-ENTRYPOINT ["sh", "/usr/local/bin/run.sh"]
+ENTRYPOINT ["python", "/usr/local/bin/run.py"]
