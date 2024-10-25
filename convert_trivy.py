@@ -85,6 +85,7 @@ def main(args):
     sonar_report = make_sonar_report(sonar_issues)
 
     out_file = os.path.join("/github/workspace", "sonar_trivy.json")
+    print("FUCK")
     print(sonar_report)
     with open(out_file, "w") as f:
         json.dump(sonar_report,f)

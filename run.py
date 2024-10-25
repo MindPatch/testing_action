@@ -68,13 +68,15 @@ class Scanner:
         subprocess.run(["ls", "-la", self.workspace_dir], check=True)
         subprocess.run(["trivy", "fs", "-f", "sarif", "-o", self.trivy_output, self.workspace_dir], check=True)
 
+        subprocess.run(["python", "/usr/local/bin/convert_trivy.py", self.trivy_output], shell=True)
+        subprocess.run(["ls", "-la", self.workspace_dir], check=True)
         print("Trivy scan complete.")
+
 
     def convert_reports(self):
         print("Converting scan results for SonarQube compatibility...")
-        subprocess.run(["ls", "-la", self.workspace_dir], check=True)
-        subprocess.run(["python", "/usr/local/bin/convert_trivy.py", self.trivy_output], shell=True)
         subprocess.run(["python", "/usr/local/bin/convert_semgrep.py", self.semgrep_output, self.sonar_semgrep], shell=True)
+        subprocess.run(["ls", "-la", self.workspace_dir], check=True)
         print("Report conversion complete.")
 
 
