@@ -176,8 +176,10 @@ def main():
     scanner.convert_semgrep()
 
     report_checker = ReportChecker()
+    os.system("ls -lah")
     report_checker.check_and_remove(scanner.sonar_trivy)
     report_checker.check_and_remove(scanner.sonar_semgrep)
+    os.system("ls -lah")
 
     sonar_scanner = SonarScanner(config_loader)
     sonar_scanner.run(scanner.sonar_trivy, scanner.sonar_semgrep)
