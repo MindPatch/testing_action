@@ -22,9 +22,9 @@ fi
 # Optional exclude paths
 if [ -n "$EXCLUDE" ]; then
     echo "Exclusion paths specified: $EXCLUDE"
-    #SONAR_EXCLUDE_OPTION="-Dsonar.exclusions=$EXCLUDE"
+    SONAR_EXCLUDE_OPTION="-Dsonar.exclusions=$EXCLUDE"
 else
-    #SONAR_EXCLUDE_OPTION=""
+    SONAR_EXCLUDE_OPTION=""
     echo "No exclusion paths specified."
 fi
 
@@ -43,12 +43,15 @@ SEMGREP_FILE="/app/sonar_semgrep.json"
 check_and_remove() {
     FILE_PATH=$1
     if [ -f "$FILE_PATH" ]; then
+        # Run checker.py and capture the output as ITEM_COUNT
         ITEM_COUNT=$(python /usr/local/bin/checker.py "$FILE_PATH")
-        if [ "$ITEM_COUNT" -le 0 ]; then
-            echo "File $FILE_PATH has no valid items. Removing it."
-            rm "$FILE_PATH"
-        else
+        
+        # Ensure ITEM_COUNT is a number and handle cases where it's not
+        if [ "$ITEM_COUNT" -gt 0 ] 2>/dev/null; then
             echo "File $FILE_PATH has valid items."
+        else
+            echo "File $FILE_PATH has one or no items, removing it."
+            rm "$FILE_PATH"
         fi
     fi
 }
@@ -57,7 +60,7 @@ check_and_remove() {
 check_and_remove "$TRIVY_FILE"
 check_and_remove "$SEMGREP_FILE"
 
-# Print environment variables for debugging (excluding sensitive data)
+# Debugging: Print environment variables (excluding sensitive data)
 echo "SONAR_PROJECTKEY: ${SONAR_PROJECTKEY}"
 echo "SONAR_HOST_URL: ${SONAR_HOST_URL}"
 echo "SONAR_TOKEN: (hidden)"
@@ -69,6 +72,7 @@ if [ -f "$TRIVY_FILE" ] && [ -f "$SEMGREP_FILE" ]; then
         -Dsonar.projectKey="$SONAR_PROJECTKEY" \
         -Dsonar.host.url="$SONAR_HOST_URL" \
         -Dsonar.login="$SONAR_TOKEN" \
+        $SONAR_EXCLUDE_OPTION \
         -Dsonar.externalIssuesReportPaths="/app/sonar_trivy.json,/app/sonar_semgrep.json"
 elif [ -f "$TRIVY_FILE" ]; then
     echo "Only sonar_trivy.json exists. Running SonarScanner with Trivy report."
@@ -76,6 +80,7 @@ elif [ -f "$TRIVY_FILE" ]; then
         -Dsonar.projectKey="$SONAR_PROJECTKEY" \
         -Dsonar.host.url="$SONAR_HOST_URL" \
         -Dsonar.login="$SONAR_TOKEN" \
+        $SONAR_EXCLUDE_OPTION \
         -Dsonar.externalIssuesReportPaths="/app/sonar_trivy.json"
 elif [ -f "$SEMGREP_FILE" ]; then
     echo "Only sonar_semgrep.json exists. Running SonarScanner with Semgrep report."
@@ -83,11 +88,13 @@ elif [ -f "$SEMGREP_FILE" ]; then
         -Dsonar.projectKey="$SONAR_PROJECTKEY" \
         -Dsonar.host.url="$SONAR_HOST_URL" \
         -Dsonar.login="$SONAR_TOKEN" \
+        $SONAR_EXCLUDE_OPTION \
         -Dsonar.externalIssuesReportPaths="/app/sonar_semgrep.json"
 else
     echo "No valid report files found. Running SonarScanner without external issue reports."
     sonar-scanner \
         -Dsonar.projectKey="$SONAR_PROJECTKEY" \
         -Dsonar.host.url="$SONAR_HOST_URL" \
-        -Dsonar.login="$SONAR_TOKEN" 
+        -Dsonar.login="$SONAR_TOKEN" \
+        $SONAR_EXCLUDE_OPTION
 fi
