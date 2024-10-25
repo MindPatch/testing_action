@@ -13,7 +13,7 @@ COPY main.py /tmp/main.py
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Switch to the non-root user
-USER worker
+USER root
 
 # Run the action with the main script
 ENTRYPOINT ["python", "/tmp/main.py"]

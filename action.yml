@@ -1,5 +1,5 @@
 name: "Blacklock Code Scanner Action"
-description: "A GitHub Action that runs Blacklock Code Scanner via Docker"
+description: "A GitHub Action that provides input validation for Blacklock Code Scanner"
 author: "My Company"
 
 inputs:
@@ -15,7 +15,7 @@ inputs:
   exclude:
     description: "Comma-separated list of paths to exclude from the scan"
     required: false
-    default: ""  # Default to no exclusions
+    default: "tester"
 
 runs:
   using: "docker"
