@@ -30,10 +30,12 @@ fi
 
 # Run Semgrep and Trivy scans
 echo "Running Semgrep and Trivy scans..."
-semgrep scan --config=auto --sarif-output=semgrep_result.sarif /app/
-trivy fs -f json -o trivy.json /app/
-python /usr/local/bin/convert_trivy.py trivy.json > /app/sonar_trivy.json
-python /usr/local/bin/convert_semgrep.py semgrep_result.sarif /app/sonar_semgrep.json
+semgrep scan --config=auto --sarif-output=semgrep_result.sarif /github/workspace
+trivy fs -f json -o trivy.json /github/workspace
+python /usr/local/bin/convert_trivy.py trivy.json > sonar_trivy.json
+python /usr/local/bin/convert_semgrep.py semgrep_result.sarif sonar_semgrep.json
+ls
+cat *.json
 
 # File paths for generated reports
 TRIVY_FILE="/app/sonar_trivy.json"
@@ -66,6 +68,7 @@ echo "SONAR_HOST_URL: ${SONAR_HOST_URL}"
 echo "SONAR_TOKEN: (hidden)"
 
 # Determine SonarScanner command based on available reports
+cd /github/workspace
 if [ -f "$TRIVY_FILE" ] && [ -f "$SEMGREP_FILE" ]; then
     echo "Both sonar_trivy.json and sonar_semgrep.json exist. Running SonarScanner with both reports."
     sonar-scanner \
