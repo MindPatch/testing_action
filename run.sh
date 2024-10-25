@@ -30,8 +30,8 @@ fi
 
 # Run Semgrep and Trivy scans
 echo "Running Semgrep and Trivy scans..."
-semgrep scan --config=auto --sarif-output=semgrep_result.sarif
-trivy fs -f json -o trivy.json /app/
+semgrep scan --config=auto --sarif-output=semgrep_result.sarif /github/workspace
+trivy fs -f json -o trivy.json /github/workspace
 python /usr/local/bin/convert_trivy.py trivy.json > /app/sonar_trivy.json
 python /usr/local/bin/convert_semgrep.py semgrep_result.sarif /app/sonar_semgrep.json
 

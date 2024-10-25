@@ -32,5 +32,5 @@ RUN chmod +x /usr/local/bin/run.sh
 ENV PATH="$PATH:/usr/local/bin"
 
 # Define the working directory and default entrypoint
-WORKDIR /app
+WORKDIR /github/workspace/
 ENTRYPOINT ["bash", "/usr/local/bin/run.sh"]
