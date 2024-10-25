@@ -1,5 +1,5 @@
-name: "Blacklock Code Scanner Action"
-description: "A GitHub Action that provides input validation for Blacklock Code Scanner"
+name: "Blacklock Code Scanner"
+description: "Scans code with Semgrep and Trivy, and uploads issues to SonarQube."
 author: "My Company"
 
 inputs:
@@ -12,23 +12,14 @@ inputs:
   sonar_token:
     description: "SonarQube Token"
     required: true
-  exclude:
-    description: "Comma-separated list of paths to exclude from the scan"
-    required: false
-    default: "tester"
 
 runs:
   using: "docker"
   image: "Dockerfile"
-  args:
-    - "--sonar_projectkey"
-    - "${{ inputs.sonar_projectkey }}"
-    - "--sonar_host_url"
-    - "${{ inputs.sonar_host_url }}"
-    - "--sonar_token"
-    - "${{ inputs.sonar_token }}"
-    - "--exclude"
-    - "${{ inputs.exclude }}"  # Pass the exclude parameter
+  env:
+    SONAR_PROJECTKEY: ${{ inputs.sonar_projectkey }}
+    SONAR_HOST_URL: ${{ inputs.sonar_host_url }}
+    SONAR_TOKEN: ${{ inputs.sonar_token }}
 
 branding:
   icon: "shield"
