@@ -52,7 +52,7 @@ class Scanner:
 
     def __init__(self, workspace_dir="/github/workspace"):
         self.workspace_dir = workspace_dir
-        self.trivy_output = os.path.join(workspace_dir, "trivy.json")
+        self.trivy_output = os.path.join(workspace_dir, "trivy_result.sarif")
         self.semgrep_output = os.path.join(workspace_dir, "semgrep_result.sarif")
         self.sonar_trivy = os.path.join(workspace_dir, "sonar_trivy.json")
         self.sonar_semgrep = os.path.join(workspace_dir, "sonar_semgrep.json")
@@ -66,7 +66,7 @@ class Scanner:
     def run_trivy(self):
         print("Running Trivy scan...")
         subprocess.run(["ls", "-la", self.workspace_dir], check=True)
-        subprocess.run(["trivy", "fs", "-f", "json", "-o", self.trivy_output, self.workspace_dir], check=True)
+        subprocess.run(["trivy", "fs", "-f", "sarif", "-o", self.trivy_output, self.workspace_dir], check=True)
         print("Trivy scan complete.")
 
     def convert_reports(self):
