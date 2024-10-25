@@ -154,8 +154,9 @@ def main():
 
     # Step 3: Initialize Scanner and Run Scans
     scanner = Scanner()
-    scanner.run_semgrep()
     scanner.run_trivy()
+    print("*"*200)
+    scanner.run_semgrep()
     scanner.convert_reports()
 
     # Step 4: Validate Reports
