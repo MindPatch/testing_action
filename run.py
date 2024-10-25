@@ -67,7 +67,6 @@ class Scanner:
         print("Running Trivy scan...")
         subprocess.run(["ls", "-la", self.workspace_dir], check=True)
         subprocess.run(["trivy", "fs", "-f", "sarif", "-o", self.trivy_output, self.workspace_dir], check=True)
-        os.system(f"cat {self.trivy_output}")
 
         print("Trivy scan complete.")
 
