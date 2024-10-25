@@ -22,7 +22,6 @@ def main(param1, param2):
     # Use config as needed
 
 if __name__ == "__main__":
-    # Read the input parameters passed from action.yml
     param1 = sys.argv[1]
     param2 = sys.argv[2] if len(sys.argv) > 2 else "No param2 provided"
     main(param1, param2)

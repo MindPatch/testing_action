@@ -1,5 +1,5 @@
 name: "My Company GitHub Action"
-description: "A GitHub Action that does X and Y with blacklock.yml"
+description: "A GitHub Action that reads blacklock.yml and performs tasks"
 author: "My Company"
 inputs:
   param1:
@@ -12,10 +12,8 @@ inputs:
 
 runs:
   using: "docker"
-  image: "docker://python:3.12"  # Set to Python 3.12
+  image: "Dockerfile"  # This tells GitHub to build the Dockerfile
   args:
-    - "python"
-    - "/src/main.py"
     - "${{ inputs.param1 }}"
     - "${{ inputs.param2 }}"
 
