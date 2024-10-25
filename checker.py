@@ -9,6 +9,7 @@ def check_and_remove(file_path):
             if isinstance(data, list) and len(data) > 1:
                 print(f"{file_path} has more than one item.")
             else:
+                print(data)
                 print(f"{file_path} has one or no items, removing it.")
                 os.remove(file_path)
     except (json.JSONDecodeError, FileNotFoundError) as e:
