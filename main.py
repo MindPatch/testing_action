@@ -3,24 +3,20 @@ import yaml
 import os
 
 def parse_blacklock_config():
-    config_path = "blacklock.yml"
+    config_path = "blacklock.yml"  # Access directly in /github/workspace
     if os.path.exists(config_path):
         with open(config_path, "r") as file:
             config = yaml.safe_load(file)
             print(f"Parsed configuration: {config}")
             return config
     else:
-        print("blacklock.yml not found in repository root.")
+        print("blacklock.yml not found.")
         return {}
 
 def main(param1, param2):
-    # Load blacklock.yml configuration if it exists
     config = parse_blacklock_config()
-
-    # Perform main action logic using parameters and parsed config
-    print(f"Running the action with param1: {param1} and param2: {param2}")
-    os.system("ls -lah")
-    # Use config as needed
+    print(f"Running with param1: {param1} and param2: {param2}")
+    # Perform main action logic here
 
 if __name__ == "__main__":
     param1 = sys.argv[1]

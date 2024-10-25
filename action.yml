@@ -1,18 +1,19 @@
-name: "My Company GitHub Action"
-description: "A GitHub Action that reads blacklock.yml and performs tasks"
+name: "My Professional GitHub Action"
+description: "A GitHub Action that reads blacklock.yml and performs tasks securely"
 author: "My Company"
+
 inputs:
   param1:
-    description: "The first parameter for the action"
+    description: "First parameter"
     required: true
     default: "default-value"
   param2:
-    description: "An optional parameter"
+    description: "Second parameter"
     required: false
 
 runs:
   using: "docker"
-  image: "Dockerfile"  # GitHub will build and use this Dockerfile
+  image: "Dockerfile"  # GitHub will use this Dockerfile to build the image
   args:
     - "${{ inputs.param1 }}"
     - "${{ inputs.param2 }}"
