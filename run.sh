@@ -75,7 +75,7 @@ if [ -f "$TRIVY_FILE" ] && [ -f "$SEMGREP_FILE" ]; then
         -Dsonar.projectKey="$SONAR_PROJECTKEY" \
         -Dsonar.host.url="$SONAR_HOST_URL" \
         -Dsonar.login="$SONAR_TOKEN" \
-        $SONAR_EXCLUDE_OPTION \
+        -Dsonar.exclusions=$EXCLUDE \
         -Dsonar.externalIssuesReportPaths="/app/sonar_trivy.json,/app/sonar_semgrep.json"
 elif [ -f "$TRIVY_FILE" ]; then
     echo "Only sonar_trivy.json exists. Running SonarScanner with Trivy report."
@@ -83,7 +83,7 @@ elif [ -f "$TRIVY_FILE" ]; then
         -Dsonar.projectKey="$SONAR_PROJECTKEY" \
         -Dsonar.host.url="$SONAR_HOST_URL" \
         -Dsonar.login="$SONAR_TOKEN" \
-        $SONAR_EXCLUDE_OPTION \
+        -Dsonar.exclusions=$EXCLUDE \
         -Dsonar.externalIssuesReportPaths="/app/sonar_trivy.json"
 elif [ -f "$SEMGREP_FILE" ]; then
     echo "Only sonar_semgrep.json exists. Running SonarScanner with Semgrep report."
@@ -91,7 +91,7 @@ elif [ -f "$SEMGREP_FILE" ]; then
         -Dsonar.projectKey="$SONAR_PROJECTKEY" \
         -Dsonar.host.url="$SONAR_HOST_URL" \
         -Dsonar.login="$SONAR_TOKEN" \
-        $SONAR_EXCLUDE_OPTION \
+        -Dsonar.exclusions=$EXCLUDE \
         -Dsonar.externalIssuesReportPaths="/app/sonar_semgrep.json"
 else
     echo "No valid report files found. Running SonarScanner without external issue reports."
@@ -99,5 +99,5 @@ else
         -Dsonar.projectKey="$SONAR_PROJECTKEY" \
         -Dsonar.host.url="$SONAR_HOST_URL" \
         -Dsonar.login="$SONAR_TOKEN" \
-        $SONAR_EXCLUDE_OPTION
+        -Dsonar.exclusions=$EXCLUDE 
 fi
