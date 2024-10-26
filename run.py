@@ -237,8 +237,10 @@ def main():
 
     sonar_scanner = SonarScanner(config_loader)
     
-    trivy_task_id = sonar_scanner.upload_sarif_report(scanner.sonar_trivy, "TRIVY")
-    semgrep_task_id = sonar_scanner.upload_sarif_report(scanner.sonar_semgrep, "SEMGREP")
+    #trivy_task_id = sonar_scanner.upload_sarif_report(scanner.sonar_trivy, "TRIVY")
+    #semgrep_task_id = sonar_scanner.upload_sarif_report(scanner.sonar_semgrep, "SEMGREP")
+    trivy_task_id = sonar_scanner.upload_sarif_report(scanner.trivy_output, "TRIVY")
+    semgrep_task_id = sonar_scanner.upload_sarif_report(scanner.semgrep_output, "SEMGREP")
 
     if trivy_task_id:
         sonar_scanner.check_task_status(trivy_task_id)
