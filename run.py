@@ -152,7 +152,8 @@ class SonarScanner:
             f"-Dsonar.projectKey={self.sonar_project_key}",
             f"-Dsonar.host.url={self.sonar_host_url}",
             f"-Dsonar.login={self.sonar_token}",
-            f"-Dsonar.exclusions={self.exclude}"
+            "sonar.inclusions=none",
+            #f"-Dsonar.exclusions={self.exclude}"
         ]
         return command
 
