@@ -6,6 +6,7 @@ import subprocess
 import requests
 from pathlib import Path
 import emoji
+from time import sleep
 from typing import Final
 
 
@@ -159,25 +160,64 @@ class SonarScanner:
         }
         data = {
             "projectKey": self.sonar_project_key,
-            "projectName": ""#self.project_name
+            "projectName": "",#self.project_name
         }
 
         response = requests.post(api_url, headers=headers, files=files, data=data)
         if response.status_code == 200:
-            print(response.content)
+            response_json = response.json()
             print(f"{report_type} SARIF report uploaded successfully to SonarQube.")
+            return response_json.get("taskId")
         else:
             print(f"Failed to upload {report_type} SARIF report to SonarQube. Status Code: {response.status_code}")
             print(response.text)
+            return None
 
-    def run(self, trivy_report, semgrep_report):
-        if os.path.isfile(trivy_report):
-            print("Uploading Trivy report...")
-            self.upload_sarif_report(trivy_report, "TRIVY")
+    def check_task_status(self, task_id):
+        """Checks the processing status of the submitted report."""
+        api_url = f"{self.sonar_host_url}/api/ce/task"
+        params = {"id": task_id}
+        headers = {"Authorization": f"Bearer {self.sonar_token}"}
+        
+        while True:
+            response = requests.get(api_url, headers=headers, params=params)
+            if response.status_code == 200:
+                task_info = response.json().get("task", {})
+                status = task_info.get("status")
+                print(f"Task Status for {task_id}: {status}")
+                
+                if status == "SUCCESS":
+                    print("Task completed successfully.")
+                    break
+                elif status == "FAILED":
+                    print("Task failed.")
+                    break
+                else:
+                    print("Task is still in progress. Waiting...")
+                    sleep(5)  # Wait before checking again
+            else:
+                print(f"Failed to check task status for {task_id}. Status Code: {response.status_code}")
+                print(response.text)
+                break
 
-        if os.path.isfile(semgrep_report):
-            print("Uploading Semgrep report...")
-            self.upload_sarif_report(semgrep_report, "SEMGREP")
+    def get_issues(self):
+        """Fetches issues from SonarQube for the specified project."""
+        api_url = f"{self.sonar_host_url}/api/issues/search"
+        params = {"projectKeys": self.sonar_project_key}
+        headers = {"Authorization": f"Bearer {self.sonar_token}"}
+
+        response = requests.get(api_url, headers=headers, params=params)
+        if response.status_code == 200:
+            issues = response.json().get("issues", [])
+            if issues:
+                print("Issues found in SonarQube:")
+                for issue in issues:
+                    print(f"  - {issue['message']} in {issue['component']}")
+            else:
+                print("No issues found.")
+        else:
+            print(f"Failed to retrieve issues. Status Code: {response.status_code}")
+            print(response.text)
 
 
 def main():
@@ -196,7 +236,16 @@ def main():
     report_checker.check_and_remove(scanner.sonar_semgrep)
 
     sonar_scanner = SonarScanner(config_loader)
-    sonar_scanner.run(scanner.sonar_trivy, scanner.sonar_semgrep)
+    
+    trivy_task_id = sonar_scanner.upload_sarif_report(scanner.sonar_trivy, "TRIVY")
+    semgrep_task_id = sonar_scanner.upload_sarif_report(scanner.sonar_semgrep, "SEMGREP")
+
+    if trivy_task_id:
+        sonar_scanner.check_task_status(trivy_task_id)
+    if semgrep_task_id:
+        sonar_scanner.check_task_status(semgrep_task_id)
+    
+    sonar_scanner.get_issues()
 
 
 if __name__ == "__main__":
