@@ -1,9 +1,9 @@
 import os
 import json
 import sys
-import random
 import yaml
 import subprocess
+import requests
 from pathlib import Path
 import emoji
 from typing import Final
@@ -139,31 +139,43 @@ class ReportChecker:
 
 
 class SonarScanner:
-    """Executes SonarScanner based on the presence of report files."""
+    """Uploads SARIF reports directly to SonarQube using the REST API."""
 
     def __init__(self, config_loader):
         self.sonar_project_key = config_loader.get("SONAR_PROJECTKEY")
-        self.sonar_host_url = "https://sonar.blacklock.io"
+        self.sonar_host_url = config_loader.get("SONAR_HOST_URL", "https://sonar.blacklock.io")
         self.sonar_token = os.getenv("SONAR_TOKEN")
         self.exclude = "**/*.java"  # Exclude all .java files
 
-    def build_base_command(self):
-        command = [
-            "sonar-scanner",
-            f"-Dsonar.projectKey={self.sonar_project_key}",
-            f"-Dsonar.host.url={self.sonar_host_url}",
-            f"-Dsonar.login={self.sonar_token}",
-            f"-Dsonar.inclusions={random.randint(100,1000)}",
-            #f"-Dsonar.exclusions={self.exclude}"
-        ]
-        return command
+    def upload_sarif_report(self, sarif_file, report_type):
+        """Uploads a SARIF report file to SonarQube via the API."""
+        api_url = f"{self.sonar_host_url}/api/qualitygates/project_status"
+        headers = {
+            "Authorization": f"Bearer {self.sonar_token}"
+        }
+        files = {
+            'file': (sarif_file, open(sarif_file, 'rb'), 'application/json')
+        }
+        data = {
+            "projectKey": self.sonar_project_key,
+            "type": report_type
+        }
+        
+        response = requests.post(api_url, headers=headers, files=files, data=data)
+        if response.status_code == 200:
+            print(f"{report_type} SARIF report uploaded successfully to SonarQube.")
+        else:
+            print(f"Failed to upload {report_type} SARIF report to SonarQube. Status Code: {response.status_code}")
+            print(response.text)
 
     def run(self, trivy_report, semgrep_report):
-        command = self.build_base_command()
-        if os.path.isfile(trivy_report) and os.path.isfile(semgrep_report):
-            command.append(f"-Dsonar.externalIssuesReportPaths={trivy_report},{semgrep_report}")
-        print(f"Running SonarScanner with command: {' '.join(command)}")
-        subprocess.run(command, check=True)
+        if os.path.isfile(trivy_report):
+            print("Uploading Trivy report...")
+            self.upload_sarif_report(trivy_report, "Trivy")
+
+        if os.path.isfile(semgrep_report):
+            print("Uploading Semgrep report...")
+            self.upload_sarif_report(semgrep_report, "Semgrep")
 
 
 def main():
@@ -178,10 +190,8 @@ def main():
     scanner.convert_semgrep()
 
     report_checker = ReportChecker()
-    os.system("ls -lah")
     report_checker.check_and_remove(scanner.sonar_trivy)
     report_checker.check_and_remove(scanner.sonar_semgrep)
-    os.system("ls -lah")
 
     sonar_scanner = SonarScanner(config_loader)
     sonar_scanner.run(scanner.sonar_trivy, scanner.sonar_semgrep)
