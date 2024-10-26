@@ -145,6 +145,7 @@ class SonarScanner:
         self.sonar_project_key = config_loader.get("SONAR_PROJECTKEY")
         self.sonar_host_url = config_loader.get("SONAR_HOST_URL", "https://sonar.blacklock.io")
         self.sonar_token = os.getenv("SONAR_TOKEN")
+        self.project_name = config_loader.get("SONAR_PROJECTNAME", "My Project")
         self.exclude = "**/*.java"  # Exclude all .java files
 
     def upload_sarif_report(self, sarif_file, report_type):
@@ -158,9 +159,9 @@ class SonarScanner:
         }
         data = {
             "projectKey": self.sonar_project_key,
-            "reportTaskType": report_type
+            "projectName": self.project_name
         }
-        
+
         response = requests.post(api_url, headers=headers, files=files, data=data)
         if response.status_code == 200:
             print(f"{report_type} SARIF report uploaded successfully to SonarQube.")
