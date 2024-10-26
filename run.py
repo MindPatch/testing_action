@@ -158,7 +158,7 @@ class SonarScanner:
             f"-Dsonar.externalIssuesReportPaths={sarif_files_str}",  # Use externalIssuesReportPaths for multiple files
             f"-Dsonar.sources=.",
             #"-Dsonar.verbose=true",
-            "sonar.issue.ignore.multicriteria.e1.resourceKey=*"
+            "-Dsonar.issue.ignore.multicriteria.e1.resourceKey=*"
             #"-Dsonar.language=none"
         ]
 
