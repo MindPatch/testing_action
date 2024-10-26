@@ -158,8 +158,12 @@ class SonarScanner:
         files = {
             'report': (sarif_file, open(sarif_file, 'rb'), 'application/json')
         }
+        thefile = ""
+        with open(sarif_file,"rb") as f:
+            thefile = f.read()
         data = {
             "projectKey": self.sonar_project_key,
+            "report": thefile,
             "projectName": "",#self.project_name
         }
 
@@ -185,6 +189,7 @@ class SonarScanner:
                 task_info = response.json().get("task", {})
                 status = task_info.get("status")
                 print(f"Task Status for {task_id}: {status}")
+                print(response.json())
                 
                 if status == "SUCCESS":
                     print("Task completed successfully.")
@@ -237,17 +242,15 @@ def main():
 
     sonar_scanner = SonarScanner(config_loader)
     
-    #trivy_task_id = sonar_scanner.upload_sarif_report(scanner.sonar_trivy, "TRIVY")
-    #semgrep_task_id = sonar_scanner.upload_sarif_report(scanner.sonar_semgrep, "SEMGREP")
-    trivy_task_id = sonar_scanner.upload_sarif_report(scanner.trivy_output, "TRIVY")
-    semgrep_task_id = sonar_scanner.upload_sarif_report(scanner.semgrep_output, "SEMGREP")
+    trivy_task_id = sonar_scanner.upload_sarif_report(scanner.sonar_trivy, "TRIVY")
+    semgrep_task_id = sonar_scanner.upload_sarif_report(scanner.sonar_semgrep, "SEMGREP")
 
     if trivy_task_id:
         sonar_scanner.check_task_status(trivy_task_id)
     if semgrep_task_id:
         sonar_scanner.check_task_status(semgrep_task_id)
     
-    sonar_scanner.get_issues()
+    #sonar_scanner.get_issues()
 
 
 if __name__ == "__main__":
