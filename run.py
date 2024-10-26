@@ -154,11 +154,11 @@ class SonarScanner:
             "sonar-scanner",
             f"-Dsonar.projectKey={self.sonar_project_key}",
             f"-Dsonar.host.url={self.sonar_host_url}",
-            f"-Dsonar.login={self.sonar_token}",
+            f"-Dsonar.token={self.sonar_token}",
             f"-Dsonar.externalIssuesReportPaths={sarif_files_str}",  # Use externalIssuesReportPaths for multiple files
             f"-Dsonar.sources=.",
             #"-Dsonar.verbose=true",
-            "-Dsonar.issue.ignore.multicriteria.e1.resourceKey=*"
+            #"-Dsonar.issue.ignore.multicriteria.e1.resourceKey=*"
             #"-Dsonar.language=none"
         ]
 
