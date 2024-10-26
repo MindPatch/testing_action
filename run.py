@@ -1,13 +1,9 @@
 import os
+import subprocess
 import json
 import sys
 import yaml
-import subprocess
-import requests
-from pathlib import Path
-import emoji
-from time import sleep
-from typing import Final
+import zipfile
 
 
 class ConfigLoader:
@@ -41,11 +37,11 @@ class EnvironmentValidator:
     def validate(self):
         required_vars = ["SONAR_PROJECTKEY", "SONAR_HOST_URL", "SONAR_TOKEN"]
         missing_vars = [var for var in required_vars if not self.config_loader.get(var)]
-
+        
         if missing_vars:
             print(f"Error: Missing required configuration variables: {', '.join(missing_vars)}")
             sys.exit(1)
-
+        
         print("Configuration validated:")
         print(f"  SONAR_PROJECTKEY: {self.config_loader.get('SONAR_PROJECTKEY')}")
         print(f"  SONAR_HOST_URL: {self.config_loader.get('SONAR_HOST_URL')}")
@@ -57,74 +53,41 @@ class Scanner:
 
     def __init__(self, workspace_dir="/github/workspace"):
         self.workspace_dir = workspace_dir
-        self.trivy_output = os.path.join(workspace_dir, "trivy_result.sarif")
+        self.trivy_output = os.path.join(workspace_dir, "trivy.json")
         self.semgrep_output = os.path.join(workspace_dir, "semgrep_result.sarif")
         self.sonar_trivy = os.path.join(workspace_dir, "sonar_trivy.json")
         self.sonar_semgrep = os.path.join(workspace_dir, "sonar_semgrep.json")
+        self.zipped_reports = os.path.join(workspace_dir, "reports.zip")
 
     def run_semgrep(self):
         print("Running Semgrep scan...")
+        subprocess.run(["ls", "-la", self.workspace_dir], check=True)
         subprocess.run(["semgrep", "scan", "--config=auto", "--sarif-output", self.semgrep_output], check=True)
         print("Semgrep scan complete.")
 
     def run_trivy(self):
         print("Running Trivy scan...")
-        subprocess.run(["trivy", "fs", "-f", "sarif", "-o", self.trivy_output, self.workspace_dir], check=True)
+        subprocess.run(["ls", "-la", self.workspace_dir], check=True)
+        subprocess.run(["trivy", "fs", "-f", "json", "-o", self.trivy_output, self.workspace_dir], check=True)
         print("Trivy scan complete.")
 
-    def convert_semgrep(self):
-        """Convert Semgrep SARIF report to SonarQube-compatible JSON format."""
-        sarif_data = json.loads(Path(self.semgrep_output).read_text(encoding='utf-8'))
-        issues = []
+    def convert_reports(self):
+        print("Converting scan results for SonarQube compatibility...")
+        subprocess.run(["ls", "-la", self.workspace_dir], check=True)
+        subprocess.run(["python", "/usr/local/bin/convert_trivy.py", self.trivy_output, ">", self.sonar_trivy], shell=True)
+        subprocess.run(["python", "/usr/local/bin/convert_semgrep.py", self.semgrep_output, self.sonar_semgrep], shell=True)
+        print("Report conversion complete.")
 
-        for run_data in sarif_data.get('runs', []):
-            engine_id = run_data['tool']['driver']['name']
-            for result in run_data.get('results', []):
-                rule_id = result['ruleId']
-                location_data = result['locations'][0]['physicalLocation']
-                file_path = location_data['artifactLocation']['uri']
-                issue = {
-                    'engineId': engine_id,
-                    'primaryLocation': {'filePath': file_path, 'message': rule_id},
-                    'ruleId': rule_id,
-                    'title': rule_id,
-                    'severity': 'INFO',  # Placeholder severity
-                    'type': 'VULNERABILITY'
-                }
-                issues.append(issue)
-
-        Path(self.sonar_semgrep).write_text(json.dumps({'issues': issues}, indent=2), encoding='utf-8')
-        print(f"Semgrep report converted to SonarQube format: {self.sonar_semgrep}")
-
-    def convert_trivy(self):
-        """Convert Trivy report to SonarQube-compatible JSON format."""
-        report = json.loads(Path(self.trivy_output).read_text(encoding='utf-8'))
-        issues = {'rules': [], 'issues': []}
-        seen_rules = set()
-
-        for result in report.get("Results", []):
-            for vuln in result.get("Vulnerabilities", []):
-                rule_id = vuln["VulnerabilityID"]
-                if rule_id not in seen_rules:
-                    issues["rules"].append({
-                        "id": rule_id,
-                        "name": emoji.replace_emoji(vuln["Title"], replace=''),
-                        "description": emoji.replace_emoji(vuln["Description"], replace=''),
-                        "engineId": "Trivy",
-                        "impacts": [{
-                            "softwareQuality": "SECURITY",
-                            "severity": "MEDIUM"  # Placeholder severity
-                        }],
-                    })
-                    seen_rules.add(rule_id)
-
-                issues["issues"].append({
-                    "ruleId": rule_id,
-                    "primaryLocation": {"filePath": vuln["Target"], "message": rule_id}
-                })
-
-        Path(self.sonar_trivy).write_text(json.dumps(issues, indent=2), encoding='utf-8')
-        print(f"Trivy report converted to SonarQube format: {self.sonar_trivy}")
+    def zip_reports(self):
+        """Zip the converted SonarQube-compatible report files."""
+        try:
+            with zipfile.ZipFile(self.zipped_reports, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                zipf.write(self.sonar_trivy, os.path.basename(self.sonar_trivy))
+                zipf.write(self.sonar_semgrep, os.path.basename(self.sonar_semgrep))
+            print(f"Reports zipped successfully as {self.zipped_reports}.")
+        except Exception as e:
+            print(f"Error zipping report files: {e}")
+            sys.exit(1)
 
 
 class ReportChecker:
@@ -134,123 +97,80 @@ class ReportChecker:
     def check_and_remove(file_path):
         if os.path.isfile(file_path):
             print(f"Checking contents of {file_path}...")
-            if os.path.getsize(file_path) == 0:
-                print(f"File {file_path} is empty. Removing it.")
+            item_count = ReportChecker.count_items(file_path)
+            if item_count > 0:
+                print(f"File {file_path} has {item_count} items.")
+            else:
+                print(f"File {file_path} has no valid items. Removing it.")
                 os.remove(file_path)
+
+    @staticmethod
+    def count_items(file_path):
+        try:
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+            if "rules" in data and isinstance(data["rules"], list):
+                return len(data["rules"])
+            elif "issues" in data and isinstance(data["issues"], list):
+                return len(data["issues"])
+        except Exception as e:
+            print(f"Error reading {file_path}: {e}")
+        return 0
 
 
 class SonarScanner:
-    """Uploads SARIF reports directly to SonarQube using the REST API."""
+    """Executes SonarScanner based on the presence of report files."""
 
-    def __init__(self, config_loader):
+    def __init__(self, config_loader, zipped_reports):
         self.sonar_project_key = config_loader.get("SONAR_PROJECTKEY")
+        self.exclude = config_loader.get("SONAR_EXCLUDE", "")
         self.sonar_host_url = config_loader.get("SONAR_HOST_URL", "https://sonar.blacklock.io")
         self.sonar_token = os.getenv("SONAR_TOKEN")
-        self.project_name = config_loader.get("SONAR_PROJECTNAME", "My Project")
-        self.exclude = "**/*.java"  # Exclude all .java files
+        self.zipped_reports = zipped_reports
 
-    def upload_sarif_report(self, sarif_file, report_type):
-        """Uploads a SARIF report file to SonarQube via the correct API endpoint."""
-        api_url = f"{self.sonar_host_url}/api/ce/submit"
-        headers = {
-            "Authorization": f"Bearer {self.sonar_token}"
-        }
-        files = {
-            'report': (sarif_file, open(sarif_file, 'rb'), 'application/json')
-        }
-        thefile = ""
-        with open(sarif_file,"rb") as f:
-            thefile = f.read()
-        data = {
-            "projectKey": self.sonar_project_key,
-            "report": thefile,
-            "projectName": "",#self.project_name
-        }
+    def build_base_command(self):
+        command = [
+            "sonar-scanner",
+            f"-Dsonar.projectKey={self.sonar_project_key}",
+            f"-Dsonar.host.url={self.sonar_host_url}",
+            f"-Dsonar.login={self.sonar_token}",
+            f"-Dsonar.externalIssuesReportPaths={self.zipped_reports}"
+        ]
+        if self.exclude:
+            command.append(f"-Dsonar.exclusions={self.exclude}")
+        return command
 
-        response = requests.post(api_url, headers=headers, files=files, data=data)
-        if response.status_code == 200:
-            response_json = response.json()
-            print(f"{report_type} SARIF report uploaded successfully to SonarQube.")
-            return response_json.get("taskId")
-        else:
-            print(f"Failed to upload {report_type} SARIF report to SonarQube. Status Code: {response.status_code}")
-            print(response.text)
-            return None
-
-    def check_task_status(self, task_id):
-        """Checks the processing status of the submitted report."""
-        api_url = f"{self.sonar_host_url}/api/ce/task"
-        params = {"id": task_id}
-        headers = {"Authorization": f"Bearer {self.sonar_token}"}
-        
-        while True:
-            response = requests.get(api_url, headers=headers, params=params)
-            if response.status_code == 200:
-                task_info = response.json().get("task", {})
-                status = task_info.get("status")
-                print(f"Task Status for {task_id}: {status}")
-                print(response.json())
-                
-                if status == "SUCCESS":
-                    print("Task completed successfully.")
-                    break
-                elif status == "FAILED":
-                    print("Task failed.")
-                    break
-                else:
-                    print("Task is still in progress. Waiting...")
-                    sleep(5)  # Wait before checking again
-            else:
-                print(f"Failed to check task status for {task_id}. Status Code: {response.status_code}")
-                print(response.text)
-                break
-
-    def get_issues(self):
-        """Fetches issues from SonarQube for the specified project."""
-        api_url = f"{self.sonar_host_url}/api/issues/search"
-        params = {"projectKeys": self.sonar_project_key}
-        headers = {"Authorization": f"Bearer {self.sonar_token}"}
-
-        response = requests.get(api_url, headers=headers, params=params)
-        if response.status_code == 200:
-            issues = response.json().get("issues", [])
-            if issues:
-                print("Issues found in SonarQube:")
-                for issue in issues:
-                    print(f"  - {issue['message']} in {issue['component']}")
-            else:
-                print("No issues found.")
-        else:
-            print(f"Failed to retrieve issues. Status Code: {response.status_code}")
-            print(response.text)
+    def run(self):
+        command = self.build_base_command()
+        print(f"SonarScanner command: {' '.join(command)}")
+        subprocess.run(command, check=True)
 
 
 def main():
+    # Step 1: Load configuration
     config_loader = ConfigLoader()
+
+    # Step 2: Validate configuration
     env_validator = EnvironmentValidator(config_loader)
     env_validator.validate()
 
+    # Step 3: Initialize Scanner, Run Scans, and Convert Reports
     scanner = Scanner()
-    scanner.run_trivy()
     scanner.run_semgrep()
-    scanner.convert_trivy()
-    scanner.convert_semgrep()
+    scanner.run_trivy()
+    scanner.convert_reports()
 
+    # Step 4: Validate Reports
     report_checker = ReportChecker()
     report_checker.check_and_remove(scanner.sonar_trivy)
     report_checker.check_and_remove(scanner.sonar_semgrep)
 
-    sonar_scanner = SonarScanner(config_loader)
-    
-    trivy_task_id = sonar_scanner.upload_sarif_report(scanner.sonar_trivy, "TRIVY")
-    semgrep_task_id = sonar_scanner.upload_sarif_report(scanner.sonar_semgrep, "SEMGREP")
+    # Step 5: Zip Reports
+    scanner.zip_reports()
 
-    if trivy_task_id:
-        sonar_scanner.check_task_status(trivy_task_id)
-    if semgrep_task_id:
-        sonar_scanner.check_task_status(semgrep_task_id)
-    
-    #sonar_scanner.get_issues()
+    # Step 6: Run SonarScanner
+    sonar_scanner = SonarScanner(config_loader, scanner.zipped_reports)
+    sonar_scanner.run()
 
 
 if __name__ == "__main__":
