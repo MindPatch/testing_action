@@ -148,17 +148,17 @@ class SonarScanner:
         self.exclude = "**/*.java"  # Exclude all .java files
 
     def upload_sarif_report(self, sarif_file, report_type):
-        """Uploads a SARIF report file to SonarQube via the API."""
-        api_url = f"{self.sonar_host_url}/api/qualitygates/project_status"
+        """Uploads a SARIF report file to SonarQube via the correct API endpoint."""
+        api_url = f"{self.sonar_host_url}/api/ce/submit"
         headers = {
             "Authorization": f"Bearer {self.sonar_token}"
         }
         files = {
-            'file': (sarif_file, open(sarif_file, 'rb'), 'application/json')
+            'report': (sarif_file, open(sarif_file, 'rb'), 'application/json')
         }
         data = {
             "projectKey": self.sonar_project_key,
-            "type": report_type
+            "reportTaskType": report_type
         }
         
         response = requests.post(api_url, headers=headers, files=files, data=data)
@@ -171,11 +171,11 @@ class SonarScanner:
     def run(self, trivy_report, semgrep_report):
         if os.path.isfile(trivy_report):
             print("Uploading Trivy report...")
-            self.upload_sarif_report(trivy_report, "Trivy")
+            self.upload_sarif_report(trivy_report, "TRIVY")
 
         if os.path.isfile(semgrep_report):
             print("Uploading Semgrep report...")
-            self.upload_sarif_report(semgrep_report, "Semgrep")
+            self.upload_sarif_report(semgrep_report, "SEMGREP")
 
 
 def main():
