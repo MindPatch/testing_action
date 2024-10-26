@@ -156,9 +156,9 @@ class SonarScanner:
             f"-Dsonar.host.url={self.sonar_host_url}",
             f"-Dsonar.login={self.sonar_token}",
             f"-Dsonar.externalIssuesReportPaths={sarif_files_str}",  # Use externalIssuesReportPaths for multiple files
-            f"-Dsonar.exclusions={self.exclude}",
             f"-Dsonar.sources=.",
-            "-Dsonar.verbose=true"
+            "-Dsonar.verbose=true",
+            "-Dsonar.language="
         ]
 
         print(f"Running sonar-scanner with reports: {sarif_files_str}")
