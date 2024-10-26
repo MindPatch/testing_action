@@ -162,6 +162,8 @@ class SonarScanner:
 
         print(f"Running sonar-scanner with reports: {sarif_files_str}")
         result = subprocess.run(command, cwd=self.workspace_dir, check=False, capture_output=True, text=True)
+        print(result.stdout)
+        print(result.stderr)
 
         if result.returncode == 0:
             print("SARIF report(s) processed successfully by sonar-scanner.")
