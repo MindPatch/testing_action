@@ -159,11 +159,12 @@ class SonarScanner:
         }
         data = {
             "projectKey": self.sonar_project_key,
-            "projectName": self.project_name
+            "projectName": ""#self.project_name
         }
 
         response = requests.post(api_url, headers=headers, files=files, data=data)
         if response.status_code == 200:
+            print(response.content)
             print(f"{report_type} SARIF report uploaded successfully to SonarQube.")
         else:
             print(f"Failed to upload {report_type} SARIF report to SonarQube. Status Code: {response.status_code}")
