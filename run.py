@@ -162,8 +162,8 @@ def main():
 
     # Step 4: Validate Reports
     report_checker = ReportChecker()
-    report_checker.check_and_remove(scanner.sonar_trivy)
-    report_checker.check_and_remove(scanner.sonar_semgrep)
+    report_checker.check_and_remove(scanner.trivy_output)
+    report_checker.check_and_remove(scanner.semgrep_output)
 
     # Step 5: Zip Reports
     scanner.zip_reports()
