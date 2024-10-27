@@ -368,6 +368,14 @@ class SarifToSonarQubeConverter:
         """
         return f"[{cve_id}] {package}"
 
+    def parse_package(self,input_text):
+        start = input_text.find("Package: ")
+        if start == -1:
+            return None
+        start += len("Package: ")
+        end = input_text.find("\n", start)
+        return input_text[start:end].strip() if end != -1 else None
+
     def parse(self):
         """
         Parse SARIF data and convert it to SonarQube JSON format.
@@ -426,7 +434,7 @@ class SarifToSonarQubeConverter:
                     "ruleId": result.get("ruleId", ""),
                     "effortMinutes": result.get("properties", {}).get("effortMinutes", 0),
                     "primaryLocation": {
-                        "message": f'[{result.get("ruleId")}] {result.get("message").get("text").split(" ")[1].rstrip()}',
+                        "message": f'[{result.get("ruleId")}] {self.parse_package(result.get("message").get("text"))}',
                         "filePath": result.get("locations", [{}])[0].get("physicalLocation", {}).get("artifactLocation", {}).get("uri", ""),
                         "textRange": {
                             "startLine": result.get("locations", [{}])[0].get("physicalLocation", {}).get("region", {}).get("startLine", 1),
@@ -437,7 +445,7 @@ class SarifToSonarQubeConverter:
                     },
                     "secondaryLocations": [
                         {
-                            "message": f'[{result.get("ruleId")}] {result.get("message").get("text").split(" ")[1].rstrip()}',
+                            "message": f'[{result.get("ruleId")}] {self.parse_package(result.get("message").get("text"))}',
                             "filePath": location.get("physicalLocation", {}).get("artifactLocation", {}).get("uri", ""),
                             "textRange": {
                                 "startLine": location.get("physicalLocation", {}).get("region", {}).get("startLine", 1)
