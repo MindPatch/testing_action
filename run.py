@@ -37,7 +37,7 @@ class EnvironmentValidator:
         self.config_loader = config_loader
 
     def validate(self):
-        required_vars = ["SONAR_PROJECTKEY", "SONAR_HOST_URL", "SONAR_TOKEN"]
+        required_vars = ["SONAR_PROJECTKEY"]
         missing_vars = [var for var in required_vars if not self.config_loader.get(var)]
 
         if missing_vars:
@@ -46,194 +46,9 @@ class EnvironmentValidator:
 
         print("Configuration validated:")
         print(f"  SONAR_PROJECTKEY: {self.config_loader.get('SONAR_PROJECTKEY')}")
-        print(f"  SONAR_HOST_URL: {self.config_loader.get('SONAR_HOST_URL')}")
         print("  SONAR_TOKEN: (hidden for security)")
 
-class TrivySonarReport:
-    LOG_PREFIX = "[trivy][plugins][sonarqube]"
-    TRIVY_SONARQUBE_SEVERITY = {
-        "UNKNOWN": "LOW",
-        "LOW": "LOW",
-        "MEDIUM": "LOW",
-        "HIGH": "MEDIUM",
-        "CRITICAL": "HIGH",
-    }
 
-    def __init__(self, filename, file_path=None):
-        self.filename = filename
-        self.file_path = file_path
-
-    def apply_changes(self, txt):
-        """Remove emojis from text."""
-        return emoji.replace_emoji(txt, replace='')
-
-    def load_trivy_report(self):
-        """Load and parse the Trivy report from a JSON file."""
-        with open(self.filename) as file:
-            return json.load(file)
-
-    def parse_trivy_report(self, report):
-        """Parse vulnerabilities from the Trivy report."""
-        for result in report.get("Results", []):
-            for vuln in result.get("Vulnerabilities", []):
-                try:
-                    vuln["Target"] = f"{report['ArtifactName']}/{result['Target']}"
-                    for key in ("VulnerabilityID", "Title", "Description", "Severity", "PrimaryURL"):
-                        if key not in vuln:
-                            raise KeyError(key)
-                except KeyError:
-                    continue
-                yield vuln
-
-    def make_sonar_issues(self, vulnerabilities):
-        """Create SonarQube issues from Trivy vulnerabilities."""
-        seen_rules = set()
-        res = {"rules": [], "issues": []}
-        
-        for vuln in vulnerabilities:
-            rule_id = vuln["VulnerabilityID"]
-            
-            if rule_id not in seen_rules:
-                res["rules"].append({
-                    "id": rule_id,
-                    "name": self.apply_changes(f"[{vuln['Target']}] {vuln['Title']}"),
-                    "description": self.apply_changes(vuln["Description"]),
-                    "engineId": "Trivy",
-                    "cleanCodeAttribute": "LOGICAL",
-                    "impacts": [{
-                        "softwareQuality": "SECURITY",
-                        "severity": self.TRIVY_SONARQUBE_SEVERITY[vuln["Severity"]],
-                    }],
-                })
-                seen_rules.add(rule_id)
-
-            res["issues"].append({
-                "ruleId": rule_id,
-                "primaryLocation": {
-                    "message": f"{rule_id} {self.apply_changes(vuln['Title'])}",
-                    "filePath": self.file_path or vuln["Target"],
-                },
-            })
-
-        return res
-
-    def generate_report(self):
-        """Generate and print the SonarQube report."""
-        if not os.path.exists(self.filename):
-            sys.exit(f"{self.LOG_PREFIX} File not found: {self.filename}")
-
-        report = self.load_trivy_report()
-        vulnerabilities = self.parse_trivy_report(report)
-        sonar_issues = self.make_sonar_issues(vulnerabilities)
-        sonar_report = json.dumps(sonar_issues, indent=2)
-        print(sonar_report)
-        return sonar_report
-        
-
-
-from pathlib import Path
-from typing import Final
-import collections
-import json
-import os
-import sys
-
-class SemgrepReport:
-    LEVEL_TO_SEVERITY: Final[dict[str, str]] = {
-        'warning': 'MAJOR',
-        'error': 'CRITICAL',
-        'note': 'MINOR',
-        'none': 'INFO'
-    }
-    DEFAULT_REPORT_TYPE: Final[str] = 'VULNERABILITY'
-    REPORT_TYPE_BY_ENGINE: Final[dict[str, str]] = {
-        'ansible-lint': 'VULNERABILITY',
-        'robocop': 'VULNERABILITY',
-        'tflint': 'VULNERABILITY'
-    }
-
-    Position = collections.namedtuple('Position', ['line', 'column'])
-
-    def __init__(self, source: Path | str, target: Path | str):
-        self.source = Path(source).resolve()
-        self.target = Path(target).resolve()
-
-    @staticmethod
-    def generate_title(scan_id, cwe_tags: list[str]) -> str:
-        """Generate a title based on scan ID and CWE tags."""
-        return cwe_tags[0] if cwe_tags else scan_id
-
-    def process_report(self) -> None:
-        """Process the SARIF report and write issues to the target file."""
-        if self.target.exists():
-            raise IOError(f'Target file "{self.target}" already exists.')
-
-        sarif_data: dict = json.loads(self.source.read_text(encoding='utf-8'))
-        if 'sarif' not in sarif_data.get('$schema', ''):
-            raise ValueError('Source is (probably) not a valid SARIF file.')
-
-        issues: list[dict] = []
-        for run_index, run_data in enumerate(sarif_data.get('runs', []), 1):
-            driver_data = run_data['tool']['driver']
-            engine_id = driver_data['name']
-            engine_key = engine_id.lower()
-            rules: dict[str, dict] = {rule['id']: rule for rule in driver_data.get('rules', [])}
-
-            for result_index, result_data in enumerate(run_data.get('results', []), 1):
-                if (num_locations := len(result_data.get('locations', []))) != 1:
-                    raise NotImplementedError(
-                        f'File {self.source} : run[{run_index}].results[{result_index}].locations[] '
-                        f'size expected 1, actual {num_locations}')
-
-                rule_id = result_data['ruleId']
-                rule_data = rules.get(rule_id, {})
-                location_data = result_data['locations'][0]['physicalLocation']
-                file_path = location_data['artifactLocation']['uri']
-                description = result_data['message']['text']
-                severity_level = rule_data.get('defaultConfiguration', {}).get('level')
-                severity = self.LEVEL_TO_SEVERITY.get(severity_level, 'INFO')
-                properties = rule_data.get('properties', {})
-                cwe_tags = [tag for tag in properties.get('tags', []) if tag.startswith('CWE-')]
-                title = f"[{file_path}] " + self.generate_title(rule_id, cwe_tags)
-
-                issue = {
-                    'engineId': engine_id,
-                    'primaryLocation': {
-                        'filePath': file_path,
-                        'message': title
-                    },
-                    'ruleId': rule_id,
-                    'title': title,
-                    'severity': severity,
-                    'type': self.REPORT_TYPE_BY_ENGINE.get(engine_key, self.DEFAULT_REPORT_TYPE)
-                }
-
-                start = self.Position(
-                    location_data['region']['startLine'] - 1,
-                    location_data['region'].get('startColumn', 1) - 1)
-                end = self.Position(
-                    location_data['region'].get('endLine', start.line + 1) - 1,
-                    location_data['region'].get('endColumn', start.column + 1) - 1)
-
-                if engine_key in {'ansible-lint', 'robocop'}:
-                    lines = Path(file_path).read_text(encoding='utf-8').split(os.linesep)
-                    if start == end or (end.column and end.column > len(lines[end.line])):
-                        if end.line + 1 < len(lines):
-                            end = self.Position(end.line + 1, 0)
-                        else:
-                            start = self.Position(start.line - 1, start.column)
-                            end = self.Position(end.line, 0)
-
-                issue['primaryLocation']['textRange'] = {
-                    'startLine': start.line + 1,
-                    'startColumn': start.column,
-                    'endLine': end.line + 1,
-                    'endColumn': end.column
-                }
-
-                issues.append(issue)
-
-        self.target.write_text(json.dumps({'issues': issues or []}, indent=2), encoding='utf-8')
 
 
 class Scanner:
@@ -266,13 +81,18 @@ class Scanner:
     def convert_semgrep(self):
         """Convert Semgrep SARIF report to SonarQube-compatible JSON format."""
         print("Converting Semgrep SARIF report to SonarQube JSON format...")
-        try:
-            semgrep_report = SemgrepReport(self.semgrep_output, self.sonar_semgrep)
-            semgrep_report.process_report()
-            print(f"Semgrep report successfully converted to {self.sonar_semgrep}.")
-        except Exception as e:
-            print(f"Error converting Semgrep report: {e}")
+        sarif_file = self.semgrep_output
+        sonarjson_file = self.sonar_semgrep
+        semgrep_data = {}
+        with open(sarif_file, 'r') as file:
+            semgrep_data = json.load(file)
+        print(semgrep_data)
 
+        converter = SemgrepToSonarQubeConverter(semgrep_data)
+        converter.parse()
+
+        # Save the converted data
+        converter.save_to_file(sonarjson_file)
 
 class ReportChecker:
     """Checks the generated reports for valid content and removes empty ones."""
@@ -294,7 +114,7 @@ class SonarScanner:
         self.sonar_host_url = config_loader.get("SONAR_HOST_URL", "https://sonar.blacklock.io")
         self.sonar_token = os.getenv("SONAR_TOKEN")
         self.workspace_dir = "/github/workspace"
-        self.exclude = "*"  # Example exclusion for .java files
+        self.exclude = "*,**.java,**/*.java"  # Example exclusion for .java files
 
     def run_sonar_scanner(self, sarif_files):
         """Runs the sonar-scanner CLI for the given SARIF report or reports."""
@@ -373,8 +193,13 @@ class SarifToSonarQubeConverter:
         if start == -1:
             return None
         start += len("Package: ")
+        
+        # Find the next newline or any stopping point like ' ' that may appear after the package name
         end = input_text.find("\n", start)
-        return input_text[start:end].strip() if end != -1 else None
+        if end == -1:
+            end = input_text.find(" ", start)
+        
+        return input_text[start:end].strip()
 
     def parse(self):
         """
@@ -476,6 +301,104 @@ class SarifToSonarQubeConverter:
         converter.parse()
         converter.save_to_file(sonarjson_file)
 
+class SemgrepToSonarQubeConverter:
+    def __init__(self, semgrep_data):
+        self.semgrep_data = semgrep_data
+        self.sonar_data = {
+            "rules": [],
+            "issues": []
+        }
+        self.rule_ids = {}
+
+    def map_severity(self, severity):
+        """
+        Map Semgrep severity levels to SonarQube 10.2-compatible severity levels.
+        """
+        severity_mapping = {
+            "ERROR": "HIGH",
+            "WARNING": "MEDIUM",
+            "INFO": "LOW"
+        }
+        return severity_mapping.get(severity.upper(), "LOW")
+
+    def create_short_title(self, rule_id, message):
+        """
+        Create a short title in the format [rule_id] message.
+        """
+        return f"[{rule_id}] {message}"
+
+    def parse(self):
+        """
+        Parse Semgrep data and convert it to SonarQube JSON format.
+        """
+        # Process rules and issues in Semgrep results
+        for result in self.semgrep_data.get("results", []):
+            message = ""
+            rule_id = result.get("check_id", "")
+            if rule_id not in self.rule_ids:
+                severity = self.map_severity(result.get("extra", {}).get("severity", "INFO"))
+                message = result.get("extra", {}).get("message", "")
+                short_title = self.create_short_title(rule_id, message)
+
+                # Build the rule dictionary
+                sonar_rule = {
+                    "id": rule_id,
+                    "name": short_title,
+                    "shortDescription": {
+                        "text": message
+                    },
+                    "fullDescription": {
+                        "text": result.get("extra", {}).get("metadata", {}).get("description", "")
+                    },
+                    "defaultConfiguration": {
+                        "level": severity.lower()
+                    },
+                    "helpUri": result.get("extra", {}).get("metadata", {}).get("url", ""),
+                    "properties": {
+                        "tags": result.get("extra", {}).get("metadata", {}).get("tags", [])
+                    }
+                }
+                self.sonar_data["rules"].append(sonar_rule)
+                self.rule_ids[rule_id] = True
+            else:
+                print("Move ..")
+                continue
+
+            # Process each issue (finding)
+            issue = {
+                "ruleId": rule_id,
+                "primaryLocation": {
+                    "message": message,
+                    "filePath": result.get("path", ""),
+                    "textRange": {
+                        "startLine": result.get("start", {}).get("line", 1),
+                        "startColumn": result.get("start", {}).get("col", 1),
+                        "endLine": result.get("end", {}).get("line", 1),
+                        "endColumn": result.get("end", {}).get("col", 1)
+                    }
+                }
+            }
+            self.sonar_data["issues"].append(issue)
+
+    def save_to_file(self, filepath):
+        """
+        Save SonarQube JSON data to a file.
+        """
+        with open(filepath, 'w') as file:
+            json.dump(self.sonar_data, file, indent=4)
+        print(f"Converted Semgrep report saved to {filepath}")
+
+    @classmethod
+    def convert(cls, semgrep_file, sonarjson_file):
+        """
+        Class method to convert Semgrep file to SonarQube JSON format and save it.
+        """
+        with open(semgrep_file, 'r') as file:
+            semgrep_data = json.load(file)
+        
+        converter = cls(semgrep_data)
+        converter.parse()
+        converter.save_to_file(sonarjson_file)
 
 def main():
     config_loader = ConfigLoader()
