@@ -437,7 +437,7 @@ class SarifToSonarQubeConverter:
                     },
                     "secondaryLocations": [
                         {
-                            "message": location.get("message", {}).get("text", ""),
+                            "message": f"{result.get('ruleId')} {result.get('Title')}",#location.get("message", {}).get("text", ""),
                             "filePath": location.get("physicalLocation", {}).get("artifactLocation", {}).get("uri", ""),
                             "textRange": {
                                 "startLine": location.get("physicalLocation", {}).get("region", {}).get("startLine", 1)
