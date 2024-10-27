@@ -426,7 +426,7 @@ class SarifToSonarQubeConverter:
                     "ruleId": result.get("ruleId", ""),
                     "effortMinutes": result.get("properties", {}).get("effortMinutes", 0),
                     "primaryLocation": {
-                        "message": result.get("message", {}).get("text", ""),
+                        "message": f'[{result.get("ruleId")}] {result.get("Title")}',
                         "filePath": result.get("locations", [{}])[0].get("physicalLocation", {}).get("artifactLocation", {}).get("uri", ""),
                         "textRange": {
                             "startLine": result.get("locations", [{}])[0].get("physicalLocation", {}).get("region", {}).get("startLine", 1),
