@@ -114,7 +114,7 @@ class SonarScanner:
         self.sonar_host_url = config_loader.get("SONAR_HOST_URL", "https://sonar.blacklock.io")
         self.sonar_token = os.getenv("SONAR_TOKEN")
         self.workspace_dir = "/github/workspace"
-        self.exclude = "*,**.java,**/*.java"  # Example exclusion for .java files
+        self.exclude = "*.java,**/*.java"  # Example exclusion for .java files
 
     def run_sonar_scanner(self, sarif_files):
         """Runs the sonar-scanner CLI for the given SARIF report or reports."""
