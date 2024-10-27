@@ -426,7 +426,7 @@ class SarifToSonarQubeConverter:
                     "ruleId": result.get("ruleId", ""),
                     "effortMinutes": result.get("properties", {}).get("effortMinutes", 0),
                     "primaryLocation": {
-                        "message": f'[{result.get("ruleId")}] {result.get("Title")}',
+                        "message": f'[{result.get("ruleId")}] {result.get("message").get("text").split(" ")[1].replace("\n","")}',
                         "filePath": result.get("locations", [{}])[0].get("physicalLocation", {}).get("artifactLocation", {}).get("uri", ""),
                         "textRange": {
                             "startLine": result.get("locations", [{}])[0].get("physicalLocation", {}).get("region", {}).get("startLine", 1),
@@ -437,7 +437,7 @@ class SarifToSonarQubeConverter:
                     },
                     "secondaryLocations": [
                         {
-                            "message": f"{result.get('ruleId')} {result.get('Title')}",#location.get("message", {}).get("text", ""),
+                            "message": f'[{result.get("ruleId")}] {result.get("message").get("text").split(" ")[1].replace("\n","")}',
                             "filePath": location.get("physicalLocation", {}).get("artifactLocation", {}).get("uri", ""),
                             "textRange": {
                                 "startLine": location.get("physicalLocation", {}).get("region", {}).get("startLine", 1)
