@@ -118,7 +118,7 @@ class SonarScanner:
             f"-Dsonar.token={self.sonar_token}",
             f"-Dsonar.externalIssuesReportPaths={sarif_files_str}",  # Use externalIssuesReportPaths for multiple files
             f"-Dsonar.sources=.",
-            f"-Dsonar.exclusions=*.jar,**/*.jar"
+            f"-Dsonar.exclusions=*.jar,**/*.jar,gradle/**"
             #"-Dsonar.verbose=true",
             #"-Dsonar.issue.ignore.multicriteria.e1.resourceKey=*"
             #"-Dsonar.language="
