@@ -1,156 +1,30 @@
 import os
-import json
 import sys
-import yaml
 import subprocess
-from pathlib import Path
-import emoji
-from typing import Final
-
-
-class ConfigLoader:
-    """Loads configuration from blacklock.yml or environment variables as a fallback."""
-
-    def __init__(self, config_file="/github/workspace/blacklock.yml"):
-        self.config = {}
-        self.config_file = config_file
-        self.load_config()
-
-    def load_config(self):
-        if os.path.exists(self.config_file):
-            print(f"Loading configuration from {self.config_file}...")
-            with open(self.config_file, "r") as file:
-                self.config = yaml.safe_load(file) or {}
-            print("Configuration loaded:")
-            print(self.config)
-        else:
-            print("Configuration file not found; defaulting to environment variables.")
-
-    def get(self, key, default=None):
-        return self.config.get(key, os.getenv(key, default))
+import json
 
 
 class EnvironmentValidator:
     """Validates that required configuration variables are set."""
 
-    def __init__(self, config_loader):
-        self.config_loader = config_loader
+    def __init__(self):
+        pass
+
+    def get(self, key, default=None):
+        return os.getenv(key, default)
 
     def validate(self):
-        required_vars = ["SONAR_PROJECTKEY"]
-        missing_vars = [var for var in required_vars if not self.config_loader.get(var)]
+        required_vars = ["SONAR_PROJECTKEY", "SONAR_TOKEN"]
+        missing_vars = [var for var in required_vars if not os.getenv(var)]
 
         if missing_vars:
             print(f"Error: Missing required configuration variables: {', '.join(missing_vars)}")
             sys.exit(1)
 
         print("Configuration validated:")
-        print(f"  SONAR_PROJECTKEY: {self.config_loader.get('SONAR_PROJECTKEY')}")
+        print(f"  SONAR_PROJECTKEY: {os.getenv('SONAR_PROJECTKEY')}")
         print("  SONAR_TOKEN: (hidden for security)")
 
-
-
-
-class Scanner:
-    """Handles the execution of security scans (Semgrep and Trivy)."""
-
-    def __init__(self, workspace_dir="/github/workspace"):
-        self.workspace_dir = workspace_dir
-        self.trivy_output = os.path.join(workspace_dir, "trivy_result.sarif")
-        self.semgrep_output = os.path.join(workspace_dir, "semgrep_result.sarif")
-        self.sonar_trivy = os.path.join(workspace_dir, "sonar_trivy.json")
-        self.sonar_semgrep = os.path.join(workspace_dir, "sonar_semgrep.json")
-
-    def run_semgrep(self):
-        print("Running Semgrep scan...")
-        subprocess.run(["semgrep", "scan", "--config=auto", "--sarif-output", self.semgrep_output], check=True)
-        print("Semgrep scan complete.")
-
-    def run_trivy(self):
-        print("Running Trivy scan...")
-        subprocess.run(["trivy", "fs", "-f", "sarif", "-o", self.trivy_output, self.workspace_dir], check=True)
-        print("Trivy scan complete.")
-
-    def convert_trivy(self):
-        """Convert Trivy SARIF report to SonarQube-compatible JSON format."""
-        sarif_file = self.trivy_output
-        sonarjson_file = self.sonar_trivy
-
-        SarifToSonarQubeConverter.convert(sarif_file, sonarjson_file)
-
-    def convert_semgrep(self):
-        """Convert Semgrep SARIF report to SonarQube-compatible JSON format."""
-        from convert_semgrep import main as convert_semgrep
-        print("Converting Semgrep SARIF report to SonarQube JSON format...")
-        sarif_file = self.semgrep_output
-        sonarjson_file = self.sonar_semgrep
-        convert_semgrep(sarif_file, sonarjson_file)
-
-class ReportChecker:
-    """Checks the generated reports for valid content and removes empty ones."""
-
-    @staticmethod
-    def check_and_remove(file_path):
-        if os.path.isfile(file_path):
-            print(f"Checking contents of {file_path}...")
-            if os.path.getsize(file_path) == 0:
-                print(f"File {file_path} is empty. Removing it.")
-                os.remove(file_path)
-
-
-class SonarScanner:
-    """Runs sonar-scanner on SARIF reports and uploads results to SonarQube."""
-
-    def __init__(self, config_loader):
-        self.sonar_project_key = config_loader.get("SONAR_PROJECTKEY")
-        self.sonar_host_url = config_loader.get("SONAR_HOST_URL", "https://sonar.blacklock.io")
-        self.sonar_token = os.getenv("SONAR_TOKEN")
-        self.workspace_dir = "/github/workspace"
-        self.exclude = "*.java,**/*.java"  # Example exclusion for .java files
-
-    def run_sonar_scanner(self, sarif_files):
-        """Runs the sonar-scanner CLI for the given SARIF report or reports."""
-        sarif_files_str = ",".join(sarif_files)  # Join multiple files with a comma
-        command = [
-            "sonar-scanner",
-            f"-Dsonar.projectKey={self.sonar_project_key}",
-            f"-Dsonar.host.url={self.sonar_host_url}",
-            f"-Dsonar.token={self.sonar_token}",
-            f"-Dsonar.externalIssuesReportPaths={sarif_files_str}",  # Use externalIssuesReportPaths for multiple files
-            f"-Dsonar.sources=.",
-            f"-Dsonar.exclusions=**/*.java"
-            #"-Dsonar.verbose=true",
-            #"-Dsonar.issue.ignore.multicriteria.e1.resourceKey=*"
-            #"-Dsonar.language="
-        ]
-
-        print(f"Running sonar-scanner with reports: {sarif_files_str}")
-        result = subprocess.run(command, cwd=self.workspace_dir, check=False, capture_output=True, text=True)
-        print(result.stdout)
-        print(result.stderr)
-
-        if result.returncode == 0:
-            print("SARIF report(s) processed successfully by sonar-scanner.")
-        else:
-            print("Failed to process SARIF report(s) with sonar-scanner. Return Code:", result.returncode)
-
-    def run(self, trivy_report, semgrep_report):
-        reports_to_process = []
-        if os.path.isfile(trivy_report):
-            reports_to_process.append(trivy_report)
-        if os.path.isfile(semgrep_report):
-            reports_to_process.append(semgrep_report)
-
-        # Check that we have both the project key and token available
-        if not self.sonar_project_key or not self.sonar_token:
-            print("Error: SONAR_PROJECTKEY or SONAR_TOKEN is not set. Please set these values and try again.")
-            return
-
-        if reports_to_process:
-            # Pass both reports (or single report) to sonar-scanner
-            self.run_sonar_scanner(reports_to_process)
-        else:
-            print("No SARIF reports available to process.")
 
 class SarifToSonarQubeConverter:
     def __init__(self, sarif_data):
@@ -293,108 +167,94 @@ class SarifToSonarQubeConverter:
         converter.parse()
         converter.save_to_file(sonarjson_file)
 
-class SemgrepToSonarQubeConverter:
-    def __init__(self, semgrep_data):
-        self.semgrep_data = semgrep_data
-        self.sonar_data = {
-            "rules": [],
-            "issues": []
-        }
-        self.rule_ids = {}
 
-    def map_severity(self, severity):
-        """
-        Map Semgrep severity levels to SonarQube 10.2-compatible severity levels.
-        """
-        severity_mapping = {
-            "ERROR": "HIGH",
-            "WARNING": "MEDIUM",
-            "INFO": "LOW"
-        }
-        return severity_mapping.get(severity.upper(), "LOW")
+class Scanner:
+    """Handles the execution of security scans (Semgrep and Trivy)."""
 
-    def create_short_title(self, rule_id, message):
-        """
-        Create a short title in the format [rule_id] message.
-        """
-        return f"[{rule_id}] {message}"
+    def __init__(self, workspace_dir="/github/workspace"):
+        self.workspace_dir = workspace_dir
+        self.trivy_output = os.path.join(workspace_dir, "trivy_result.sarif")
+        self.semgrep_output = os.path.join(workspace_dir, "semgrep_result.sarif")
+        self.sonar_trivy = os.path.join(workspace_dir, "sonar_trivy.json")
+        self.sonar_semgrep = os.path.join(workspace_dir, "sonar_semgrep.json")
 
-    def parse(self):
-        """
-        Parse Semgrep data and convert it to SonarQube JSON format.
-        """
-        # Process rules and issues in Semgrep results
-        for result in self.semgrep_data.get("results", []):
-            message = ""
-            rule_id = result.get("check_id", "")
-            if rule_id not in self.rule_ids:
-                severity = self.map_severity(result.get("extra", {}).get("severity", "INFO"))
-                message = result.get("extra", {}).get("message", "")
-                short_title = self.create_short_title(rule_id, message)
+    def run_semgrep(self):
+        print("Running Semgrep scan...")
+        subprocess.run(["semgrep", "scan", "--config=auto", "--sarif-output", self.semgrep_output], check=True)
+        print("Semgrep scan complete.")
 
-                # Build the rule dictionary
-                sonar_rule = {
-                    "id": rule_id,
-                    "name": short_title,
-                    "shortDescription": {
-                        "text": message
-                    },
-                    "fullDescription": {
-                        "text": result.get("extra", {}).get("metadata", {}).get("description", "")
-                    },
-                    "defaultConfiguration": {
-                        "level": severity.lower()
-                    },
-                    "helpUri": result.get("extra", {}).get("metadata", {}).get("url", ""),
-                    "properties": {
-                        "tags": result.get("extra", {}).get("metadata", {}).get("tags", [])
-                    }
-                }
-                self.sonar_data["rules"].append(sonar_rule)
-                self.rule_ids[rule_id] = True
-            else:
-                print("Move ..")
-                continue
+    def run_trivy(self):
+        print("Running Trivy scan...")
+        subprocess.run(["trivy", "fs", "-f", "sarif", "-o", self.trivy_output, self.workspace_dir], check=True)
+        print("Trivy scan complete.")
 
-            # Process each issue (finding)
-            issue = {
-                "ruleId": rule_id,
-                "primaryLocation": {
-                    "message": message,
-                    "filePath": result.get("path", ""),
-                    "textRange": {
-                        "startLine": result.get("start", {}).get("line", 1),
-                        "startColumn": result.get("start", {}).get("col", 1),
-                        "endLine": result.get("end", {}).get("line", 1),
-                        "endColumn": result.get("end", {}).get("col", 1)
-                    }
-                }
-            }
-            self.sonar_data["issues"].append(issue)
+    def convert_trivy(self):
+        """Convert Trivy SARIF report to SonarQube-compatible JSON format."""
+        SarifToSonarQubeConverter.convert(self.trivy_output, self.sonar_trivy)
 
-    def save_to_file(self, filepath):
-        """
-        Save SonarQube JSON data to a file.
-        """
-        with open(filepath, 'w') as file:
-            json.dump(self.sonar_data, file, indent=4)
-        print(f"Converted Semgrep report saved to {filepath}")
+    def convert_semgrep(self):
+        """Convert Semgrep SARIF report to SonarQube-compatible JSON format."""
+        from convert_semgrep import main as semgrep_convert
+        semgrep_convert(self.semgrep_output, self.sonar_semgrep)
 
-    @classmethod
-    def convert(cls, semgrep_file, sonarjson_file):
-        """
-        Class method to convert Semgrep file to SonarQube JSON format and save it.
-        """
-        with open(semgrep_file, 'r') as file:
-            semgrep_data = json.load(file)
-        
-        converter = cls(semgrep_data)
-        converter.parse()
-        converter.save_to_file(sonarjson_file)
+
+class ReportChecker:
+    """Checks the generated reports for valid content and removes empty ones."""
+
+    @staticmethod
+    def check_and_remove(file_path):
+        if os.path.isfile(file_path) and os.path.getsize(file_path) == 0:
+            print(f"File {file_path} is empty. Removing it.")
+            os.remove(file_path)
+
+
+class SonarScanner:
+    """Runs sonar-scanner on SARIF reports and uploads results to SonarQube."""
+
+    def __init__(self):
+        self.sonar_project_key = os.getenv("SONAR_PROJECTKEY")
+        self.sonar_host_url = os.getenv("SONAR_HOST_URL", "https://sonar.blacklock.io")
+        self.sonar_token = os.getenv("SONAR_TOKEN")
+        self.workspace_dir = "/github/workspace"
+        self.sonar_exclusions = os.getenv("SONAR_EXCLUSIONS", "**/*.zip")  # Default exclusion for Java files
+
+    def run_sonar_scanner(self, sarif_files):
+        """Runs the sonar-scanner CLI for the given SARIF report or reports."""
+        sarif_files_str = ",".join(sarif_files)
+        command = [
+            "sonar-scanner",
+            f"-Dsonar.projectKey={self.sonar_project_key}",
+            f"-Dsonar.host.url={self.sonar_host_url}",
+            f"-Dsonar.token={self.sonar_token}",
+            f"-Dsonar.externalIssuesReportPaths={sarif_files_str}",
+            f"-Dsonar.sources=.",
+            f"-Dsonar.exclusions={self.sonar_exclusions}"
+        ]
+
+        print(f"Running sonar-scanner with reports: {sarif_files_str}")
+        result = subprocess.run(command, cwd=self.workspace_dir, check=False, capture_output=True, text=True)
+        print(result.stdout)
+        print(result.stderr)
+
+        if result.returncode == 0:
+            print("SARIF report(s) processed successfully by sonar-scanner.")
+        else:
+            print("Failed to process SARIF report(s) with sonar-scanner. Return Code:", result.returncode)
+
+    def run(self, trivy_report, semgrep_report):
+        reports_to_process = [report for report in [trivy_report, semgrep_report] if os.path.isfile(report)]
+        if not self.sonar_project_key or not self.sonar_token:
+            print("Error: SONAR_PROJECTKEY or SONAR_TOKEN is not set. Please set these values and try again.")
+            return
+
+        if reports_to_process:
+            self.run_sonar_scanner(reports_to_process)
+        else:
+            print("No SARIF reports available to process.")
+
 
 def main():
-    config_loader = ConfigLoader()
-    env_validator = EnvironmentValidator(config_loader)
+    env_validator = EnvironmentValidator()
     env_validator.validate()
 
     scanner = Scanner()
@@ -407,7 +267,7 @@ def main():
     report_checker.check_and_remove(scanner.sonar_trivy)
     report_checker.check_and_remove(scanner.sonar_semgrep)
 
-    sonar_scanner = SonarScanner(config_loader)
+    sonar_scanner = SonarScanner()
     sonar_scanner.run(scanner.sonar_trivy, scanner.sonar_semgrep)
 
 
