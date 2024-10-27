@@ -126,10 +126,10 @@ class SonarScanner:
             f"-Dsonar.token={self.sonar_token}",
             f"-Dsonar.externalIssuesReportPaths={sarif_files_str}",  # Use externalIssuesReportPaths for multiple files
             f"-Dsonar.sources=.",
-            #f"-Dsonar.exclusions=*.java,**/*.java"
+            f"-Dsonar.exclusions=*.jar,**/*.jar"
             #"-Dsonar.verbose=true",
             #"-Dsonar.issue.ignore.multicriteria.e1.resourceKey=*"
-            "-Dsonar.language="
+            #"-Dsonar.language="
         ]
 
         print(f"Running sonar-scanner with reports: {sarif_files_str}")
