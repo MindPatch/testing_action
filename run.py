@@ -80,19 +80,11 @@ class Scanner:
 
     def convert_semgrep(self):
         """Convert Semgrep SARIF report to SonarQube-compatible JSON format."""
+        from convert_semgrep import main as convert_semgrep
         print("Converting Semgrep SARIF report to SonarQube JSON format...")
         sarif_file = self.semgrep_output
         sonarjson_file = self.sonar_semgrep
-        semgrep_data = {}
-        with open(sarif_file, 'r') as file:
-            semgrep_data = json.load(file)
-        print(semgrep_data)
-
-        converter = SemgrepToSonarQubeConverter(semgrep_data)
-        converter.parse()
-
-        # Save the converted data
-        converter.save_to_file(sonarjson_file)
+        convert_semgrep(sarif_file, sonarjson_file)
 
 class ReportChecker:
     """Checks the generated reports for valid content and removes empty ones."""
@@ -134,14 +126,11 @@ class SonarScanner:
 
         print(f"Running sonar-scanner with reports: {sarif_files_str}")
         result = subprocess.run(command, cwd=self.workspace_dir, check=False, capture_output=True, text=True)
-        print(result.stdout)
-        print(result.stderr)
 
         if result.returncode == 0:
             print("SARIF report(s) processed successfully by sonar-scanner.")
         else:
             print("Failed to process SARIF report(s) with sonar-scanner. Return Code:", result.returncode)
-            print(result.stderr)
 
     def run(self, trivy_report, semgrep_report):
         reports_to_process = []
